@@ -1,278 +1,1076 @@
-// ============================================================
-// Fruitful Communities — Placement Tracker
-// Google Apps Script Backend v2
-// Fixes: CORS handling, POST via GET workaround
-// ============================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Fruitful Communities — Placement Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+:root {
+  --blue:#1B5AAB; --blue-l:#E8EFF9; --blue-d:#143f78; --blue-xl:#f0f5fd;
+  --green:#3AAA35; --green-l:#E8F5E8; --green-d:#277a23; --green-xl:#f0faf0;
+  --red:#E63329; --red-l:#FDECEA;
+  --yellow:#F2CC0C; --yellow-l:#FEFAE0; --yellow-d:#b89900;
+  --black:#0f0f0f; --gray:#64748b; --gray-l:#f8fafc; --border:#e2e8f0;
+  --card:#ffffff; --radius:12px; --radius-sm:8px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.08);
+  --shadow-lg:0 8px 30px rgba(0,0,0,.12);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:var(--font);background:#f0f4f8;color:var(--black);min-height:100vh;-webkit-font-smoothing:antialiased;}
 
-const SHEET_NAME = 'Sheet1';
-const REPORT_EMAIL = 'Deborah@fruitfulcommunities.ca';
+/* Layout */
+.app{max-width:680px;margin:0 auto;padding:1.25rem 1rem 5rem;}
 
-// ── CORS helper ──────────────────────────────────────────
-function corsOutput(data) {
-  const output = ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
-  return output;
+/* Top bar */
+.topbar{background:var(--blue);padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(27,90,171,.3);}
+.topbar-logo{display:flex;align-items:center;gap:10px;}
+.topbar-logo img{height:32px;width:auto;}
+.topbar-title{font-size:14px;font-weight:600;color:#fff;letter-spacing:.01em;}
+.topbar-sub{font-size:11px;color:rgba(255,255,255,.7);}
+.topbar-status{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:rgba(255,255,255,.85);}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* Rainbow bar */
+.rainbow{height:4px;background:linear-gradient(90deg,var(--blue) 0%,var(--green) 33%,var(--yellow) 66%,var(--red) 100%);}
+
+/* Tabs */
+.tabs-wrap{position:sticky;top:52px;z-index:99;background:#f0f4f8;padding:.75rem 0 .5rem;}
+.tabs{display:flex;gap:4px;background:#e2e8f0;border-radius:12px;padding:4px;}
+.tab{flex:1;padding:9px 4px;border:none;border-radius:9px;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--gray);transition:all .18s;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:4px;}
+.tab i{font-size:13px;}
+.tab.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(27,90,171,.35);}
+.tab.mgr.active{background:var(--green);box-shadow:0 2px 8px rgba(58,170,53,.35);}
+.sec{display:none;padding-top:.75rem;}.sec.active{display:block;}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:.875rem;box-shadow:var(--shadow);}
+.card-title{font-size:13px;font-weight:700;color:var(--blue-d);margin-bottom:1rem;display:flex;align-items:center;gap:7px;text-transform:uppercase;letter-spacing:.06em;}
+.card-title i{color:var(--blue);font-size:16px;}
+
+/* Fields */
+.field{margin-bottom:1rem;}
+.field:last-child{margin-bottom:0;}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--gray);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em;}
+.field input,.field select,.field textarea{width:100%;font-size:14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#fff;color:var(--black);padding:9px 12px;font-family:var(--font);transition:border .15s,box-shadow .15s;appearance:none;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(27,90,171,.12);}
+.field textarea{min-height:80px;resize:vertical;line-height:1.5;}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* Chips */
+.chip-group{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+.chip{padding:6px 13px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);color:var(--gray);background:#fff;transition:all .14s;user-select:none;font-family:var(--font);}
+.chip:hover{border-color:#94a3b8;}
+.chip.sel-b{background:var(--blue-l);color:var(--blue-d);border-color:var(--blue);font-weight:600;}
+.chip.sel-y{background:var(--yellow-l);color:var(--yellow-d);border-color:var(--yellow);font-weight:600;}
+.chip.sel-g{background:var(--green-l);color:var(--green-d);border-color:var(--green);font-weight:600;}
+.slbl{font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;margin:.75rem 0 .4rem;}
+
+/* Clock */
+.clock-row{display:flex;align-items:center;gap:14px;padding:.25rem 0 .75rem;}
+.clock-display{font-family:var(--mono);font-size:32px;font-weight:500;color:var(--blue-d);letter-spacing:.05em;min-width:110px;}
+.btn-clock{padding:10px 22px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-size:14px;font-weight:700;font-family:var(--font);transition:all .15s;letter-spacing:.02em;}
+.btn-clock.in{background:var(--green);color:#fff;box-shadow:0 2px 8px rgba(58,170,53,.3);}
+.btn-clock.in:hover{background:var(--green-d);}
+.btn-clock.out{background:var(--red);color:#fff;box-shadow:0 2px 8px rgba(230,51,41,.3);}
+.btn-clock.out:hover{background:#c0261e;}
+.clock-stat{font-size:12px;color:var(--gray);display:flex;align-items:center;gap:6px;}
+.sdot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.dot-g{background:var(--green);animation:pulse 2s infinite;}
+.dot-r{background:var(--red);}
+
+/* Buttons */
+.btn{width:100%;padding:13px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;letter-spacing:.02em;}
+.btn-blue{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(27,90,171,.25);}
+.btn-blue:hover{background:var(--blue-d);}
+.btn-green{background:var(--green);color:#fff;box-shadow:0 2px 8px rgba(58,170,53,.25);}
+.btn-green:hover{background:var(--green-d);}
+.btn-yellow{background:var(--yellow);color:var(--black);box-shadow:0 2px 8px rgba(242,204,12,.3);}
+.btn-yellow:hover{background:var(--yellow-d);color:#fff;}
+.btn-outline{background:#fff;color:var(--blue);border:2px solid var(--blue);}
+.btn-outline:hover{background:var(--blue-l);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+.btn-row{display:flex;gap:10px;margin-top:.5rem;}
+.btn-row .btn{margin-top:0;}
+
+/* Alerts */
+.alert{padding:11px 15px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:1rem;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.alert i{flex-shrink:0;margin-top:1px;}
+.al-g{background:var(--green-l);color:var(--green-d);border:1px solid var(--green);}
+.al-b{background:var(--blue-l);color:var(--blue-d);border:1px solid var(--blue);}
+.al-y{background:var(--yellow-l);color:var(--yellow-d);border:1px solid #e6c200;}
+.al-r{background:var(--red-l);color:#a11;border:1px solid var(--red);}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;}
+.bdg-b{background:var(--blue-l);color:var(--blue-d);}
+.bdg-y{background:var(--yellow-l);color:var(--yellow-d);}
+.bdg-g{background:var(--green-l);color:var(--green-d);}
+.bdg-gr{background:#f1f5f9;color:var(--gray);}
+
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem;}
+.stat{border-radius:var(--radius-sm);padding:13px 10px;text-align:center;}
+.stat.b{background:var(--blue-l);} .stat.g{background:var(--green-l);} .stat.y{background:var(--yellow-l);}
+.stat-num{font-size:24px;font-weight:700;line-height:1;}
+.stat-num.b{color:var(--blue-d);} .stat-num.g{color:var(--green-d);} .stat-num.y{color:var(--yellow-d);}
+.stat-lbl{font-size:10px;font-weight:600;color:var(--gray);margin-top:4px;text-transform:uppercase;letter-spacing:.05em;}
+
+/* Logs */
+.log-item{padding:12px 0;border-bottom:1px solid #f1f5f9;}
+.log-item:last-child{border-bottom:none;}
+.log-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;}
+.log-name{font-size:14px;font-weight:600;color:var(--black);}
+.log-date{font-size:11px;color:var(--gray);}
+.log-meta{font-size:12px;color:var(--gray);margin-bottom:6px;}
+.log-chips{display:flex;flex-wrap:wrap;gap:4px;}
+
+/* PIN / Lock */
+.pin-screen{text-align:center;padding:2.5rem 1rem;}
+.pin-icon{width:64px;height:64px;border-radius:50%;background:var(--blue-l);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;}
+.pin-icon i{font-size:30px;color:var(--blue);}
+.pin-dots{display:flex;gap:10px;justify-content:center;margin:1.25rem 0;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--blue);background:transparent;transition:all .15s;}
+.pin-dot.filled{background:var(--blue);}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:240px;margin:0 auto;}
+.num-btn{padding:15px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;font-size:20px;font-weight:600;cursor:pointer;color:var(--black);transition:all .12s;font-family:var(--font);box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.num-btn:hover{background:var(--gray-l);border-color:#94a3b8;}
+.num-btn:active{transform:scale(.94);}
+.num-btn.enter{background:var(--blue);color:#fff;border-color:var(--blue);}
+.num-btn.enter:hover{background:var(--blue-d);}
+
+/* Manager nav */
+.mgr-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem;}
+.mgr-btn{padding:7px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray);transition:all .15s;font-family:var(--font);}
+.mgr-btn.active{background:var(--green);color:#fff;border-color:var(--green);}
+.mgr-sec{display:none;}.mgr-sec.active{display:block;}
+
+/* Bar charts */
+.bar-item{margin-bottom:9px;}
+.bar-label{font-size:12px;color:var(--gray);margin-bottom:3px;display:flex;justify-content:space-between;}
+.bar-track{height:9px;border-radius:5px;background:#e8edf5;overflow:hidden;}
+.bar-fill{height:100%;border-radius:5px;transition:width .6s ease;}
+.bar-blue{background:var(--blue);}
+.bar-green{background:var(--green);}
+.bar-yellow{background:var(--yellow);}
+
+/* Student roster */
+.student-row{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid #f1f5f9;}
+.student-row:last-child{border-bottom:none;}
+.avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+.stu-info{flex:1;}
+.stu-name{font-size:14px;font-weight:600;color:var(--black);}
+.stu-meta{font-size:12px;color:var(--gray);}
+.stu-stats{text-align:right;font-size:12px;color:var(--gray);}
+.stu-stats strong{display:block;font-size:15px;font-weight:700;color:var(--blue-d);}
+
+/* Table */
+.tbl{width:100%;font-size:12px;border-collapse:collapse;}
+.tbl th{text-align:left;padding:7px 9px;color:var(--gray);font-weight:700;border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.05em;}
+.tbl td{padding:8px 9px;border-bottom:1px solid #f1f5f9;color:var(--black);}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:var(--gray-l);}
+
+/* Info box */
+.info-box{background:var(--blue-xl);border-left:3px solid var(--blue);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:12px 14px;font-size:13px;color:var(--blue-d);margin-bottom:14px;line-height:1.6;}
+
+/* Saving indicator */
+.saving-bar{height:3px;background:transparent;border-radius:2px;overflow:hidden;margin-bottom:.5rem;transition:all .3s;}
+.saving-bar.active{background:#e2e8f0;}
+.saving-bar.active::after{content:'';display:block;height:100%;width:60%;background:var(--green);animation:sweep 1.2s ease-in-out infinite;border-radius:2px;}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(250%)};}
+
+/* Mobile tweaks */
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .r2{grid-template-columns:1fr;}
+  .clock-display{font-size:26px;}
+  .tab span{display:none;}
 }
 
-// ── ALL requests come through doGet ──────────────────────
-// We use GET for everything to avoid CORS preflight issues
-// Parameters are passed as URL query params
-function doGet(e) {
-  try {
-    const p = e.parameter;
-    const action = p.action;
+/* Empty state */
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--gray);}
+.empty i{font-size:36px;opacity:.3;display:block;margin-bottom:10px;}
+.empty p{font-size:14px;}
 
-    if (action === 'ping') {
-      return corsOutput({ success: true, message: 'Connected', time: new Date().toISOString() });
-    }
+/* Sync steps */
+.steps{list-style:none;counter-reset:step;padding:0;}
+.steps li{counter-increment:step;display:flex;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9;font-size:13px;line-height:1.5;color:var(--black);}
+.steps li:last-child{border-bottom:none;}
+.steps li::before{content:counter(step);min-width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
 
-    if (action === 'getShifts') {
-      return getShifts();
-    }
+/* Connection status */
+.conn-ok{color:var(--green-d);font-weight:600;font-size:12px;}
+.conn-err{color:#a11;font-weight:600;font-size:12px;}
+</style>
+</head>
+<body>
 
-    if (action === 'submitShift') {
-      return submitShift(p);
-    }
-
-    if (action === 'saveProgress') {
-      return saveProgress(p);
-    }
-
-    return corsOutput({ success: false, error: 'Unknown action: ' + action });
-
-  } catch (err) {
-    return corsOutput({ success: false, error: err.message, stack: err.stack });
-  }
-}
-
-// Keep doPost as fallback
-function doPost(e) {
-  return doGet(e);
-}
-
-// ── GET all shifts ───────────────────────────────────────
-function getShifts() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) return corsOutput({ success: false, error: 'Sheet not found: ' + SHEET_NAME });
-
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return corsOutput({ success: true, shifts: [] });
-
-  const headers = data[0];
-  const shifts = data.slice(1)
-    .filter(row => row[0]) // skip empty rows
-    .map(row => {
-      const obj = {};
-      headers.forEach((h, i) => {
-        const key = headerToKey(h.toString());
-        obj[key] = row[i] !== undefined ? row[i].toString() : '';
-      });
-      return obj;
-    });
-
-  return corsOutput({ success: true, shifts: shifts });
-}
-
-// ── Convert header to camelCase key ─────────────────────
-function headerToKey(h) {
-  return h
-    .trim()
-    .replace(/[^a-zA-Z0-9\s]/g, '')
-    .replace(/\s+(.)/g, function(_, c) { return c.toUpperCase(); })
-    .replace(/^(.)/, function(c) { return c.toLowerCase(); });
-}
-
-// ── SUBMIT a completed shift ──────────────────────────────
-function submitShift(p) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) return corsOutput({ success: false, error: 'Sheet not found' });
-
-  const shiftId = p.shiftId || (p.firstName + '_' + p.lastName + '_' + Date.now()).toLowerCase().replace(/\s/g,'');
-  const existingRow = findRowByShiftId(sheet, shiftId);
-
-  const row = [
-    shiftId,
-    p.date || '',
-    p.firstName || '',
-    p.lastName || '',
-    p.program || '',
-    p.clockIn || '',
-    p.clockOut || '',
-    p.hours || '0',
-    'Submitted',
-    p.areas || '',
-    p.techSkills || '',
-    p.softSkills || '',
-    p.skillsHow || '',
-    p.frameworks || '',
-    p.frameworkHow || '',
-    p.summary || '',
-    p.challenges || '',
-    p.clients || '0',
-    new Date().toISOString()
-  ];
-
-  if (existingRow > 0) {
-    sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-
-  // Try to send email notification
-  try { sendDailyReport('today'); } catch(emailErr) {
-    Logger.log('Email error: ' + emailErr.message);
-  }
-
-  return corsOutput({ success: true, message: 'Shift submitted', shiftId: shiftId });
-}
-
-// ── SAVE progress (draft) ────────────────────────────────
-function saveProgress(p) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) return corsOutput({ success: false, error: 'Sheet not found' });
-
-  const shiftId = p.shiftId || (p.firstName + '_' + p.lastName + '_' + new Date().toISOString().split('T')[0]).toLowerCase().replace(/\s/g,'');
-  const existingRow = findRowByShiftId(sheet, shiftId);
-
-  const row = [
-    shiftId,
-    p.date || '',
-    p.firstName || '',
-    p.lastName || '',
-    p.program || '',
-    p.clockIn || '',
-    p.clockOut || '',
-    '',
-    'In Progress',
-    p.areas || '',
-    p.techSkills || '',
-    p.softSkills || '',
-    p.skillsHow || '',
-    p.frameworks || '',
-    p.frameworkHow || '',
-    p.summary || '',
-    p.challenges || '',
-    p.clients || '0',
-    new Date().toISOString()
-  ];
-
-  if (existingRow > 0) {
-    sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-
-  return corsOutput({ success: true, message: 'Progress saved', shiftId: shiftId });
-}
-
-// ── Find a row by Shift ID ───────────────────────────────
-function findRowByShiftId(sheet, shiftId) {
-  if (!shiftId) return -1;
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0].toString() === shiftId.toString()) return i + 1;
-  }
-  return -1;
-}
-
-// ── DAILY EMAIL REPORT ───────────────────────────────────
-function sendDailyReport(period) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return;
-
-  const today = new Date().toISOString().split('T')[0];
-  const weekAgo = new Date(Date.now() - 7*86400000).toISOString().split('T')[0];
-  const headers = data[0];
-
-  const allRows = data.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = row[i] ? row[i].toString() : ''; });
-    return obj;
-  });
-
-  let subset = allRows.filter(r => r['Status'] === 'Submitted');
-  if (period === 'today') subset = subset.filter(r => r['Date'] === today);
-  if (period === 'week') subset = subset.filter(r => r['Date'] >= weekAgo);
-  if (!subset.length) return;
-
-  const totalHours = subset.reduce((a,r) => a + (parseFloat(r['Hours'])||0), 0);
-  const totalClients = subset.reduce((a,r) => a + (parseInt(r['Clients'])||0), 0);
-  const students = [...new Set(subset.map(r => r['First Name'] + ' ' + r['Last Name']))];
-  const areas = [...new Set(subset.flatMap(r => (r['Areas']||'').split(',').map(a=>a.trim()).filter(Boolean)))];
-
-  const rows = subset.map(r => `
-    <tr style="border-bottom:1px solid #e8f0fe">
-      <td style="padding:8px 10px;font-weight:500">${r['First Name']} ${r['Last Name']}</td>
-      <td style="padding:8px 10px;font-size:12px">${r['Program']||''}</td>
-      <td style="padding:8px 10px">${r['Areas']||'-'}</td>
-      <td style="padding:8px 10px">${parseFloat(r['Hours']||0).toFixed(1)}h</td>
-      <td style="padding:8px 10px;font-weight:bold;color:#3AAA35">${r['Clients']||0}</td>
-    </tr>`).join('');
-
-  const html = `
-<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#333">
-  <div style="background:#1B5AAB;padding:20px 24px;border-radius:8px 8px 0 0">
-    <div style="font-size:20px;font-weight:bold;color:#fff">Fruitful Communities</div>
-    <div style="font-size:13px;color:#b3cef0;margin-top:3px">Placement Report - ${today}</div>
-  </div>
-  <div style="height:4px;background:linear-gradient(90deg,#1B5AAB 0%,#3AAA35 33%,#F2CC0C 66%,#E63329 100%)"></div>
-  <div style="background:#f9faf7;padding:24px;border:1px solid #dde8f5;border-radius:0 0 8px 8px">
-    <p>Dear Deborah,</p>
-    <p style="font-size:14px;line-height:1.7;margin-bottom:20px">Here is today's placement activity summary.</p>
-    <table style="width:100%;border-collapse:separate;border-spacing:8px;margin-bottom:16px">
-      <tr>
-        <td style="background:#E8EFF9;border-radius:8px;padding:12px;text-align:center">
-          <div style="font-size:22px;font-weight:bold;color:#143f78">${subset.length}</div>
-          <div style="font-size:11px;color:#555">Shifts</div>
-        </td>
-        <td style="background:#E8F5E8;border-radius:8px;padding:12px;text-align:center">
-          <div style="font-size:22px;font-weight:bold;color:#277a23">${totalHours.toFixed(1)}h</div>
-          <div style="font-size:11px;color:#555">Hours</div>
-        </td>
-        <td style="background:#FEFAE0;border-radius:8px;padding:12px;text-align:center">
-          <div style="font-size:22px;font-weight:bold;color:#b89900">${totalClients}</div>
-          <div style="font-size:11px;color:#555">Clients</div>
-        </td>
-        <td style="background:#E8EFF9;border-radius:8px;padding:12px;text-align:center">
-          <div style="font-size:22px;font-weight:bold;color:#143f78">${students.length}</div>
-          <div style="font-size:11px;color:#555">Students</div>
-        </td>
-      </tr>
-    </table>
-    <div style="font-size:13px;margin-bottom:16px">
-      <strong style="color:#1B5AAB">Areas:</strong> ${areas.join(', ')||'-'}<br>
-      <strong style="color:#1B5AAB">Students:</strong> ${students.join(', ')||'-'}
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <img src="data:image/png;base64,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" alt="Fruitful Communities"/>
+    <div>
+      <div class="topbar-title">Fruitful Communities</div>
+      <div class="topbar-sub">Placement Student Tracker</div>
     </div>
-    <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:6px;border:1px solid #dde8f5;font-size:13px">
-      <thead><tr style="background:#1B5AAB;color:#fff">
-        <th style="padding:9px 10px;text-align:left">Student</th>
-        <th style="padding:9px 10px;text-align:left">Program</th>
-        <th style="padding:9px 10px;text-align:left">Area</th>
-        <th style="padding:9px 10px;text-align:left">Hours</th>
-        <th style="padding:9px 10px;text-align:left">Clients</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <p style="margin-top:20px;font-size:13px">Warm regards,<br><strong style="color:#1B5AAB">Fruitful Communities Placement Tracking System</strong></p>
-    <p style="font-size:11px;color:#aaa;margin-top:12px">Auto-generated ${new Date().toLocaleString()}</p>
   </div>
-</div>`;
+  <div class="topbar-status" id="conn-status">
+    <span class="status-dot"></span> Connected
+  </div>
+</div>
+<div class="rainbow"></div>
 
-  GmailApp.sendEmail(
-    REPORT_EMAIL,
-    'Fruitful Communities - Daily Placement Report - ' + today,
-    'Please view this email in HTML format.',
-    { htmlBody: html }
-  );
+<div class="app">
+  <div class="tabs-wrap">
+    <div class="tabs">
+      <button class="tab active" onclick="sw('clock')"><i class="ti ti-clock"></i><span>Log Shift</span></button>
+      <button class="tab" onclick="sw('logs')"><i class="ti ti-list"></i><span>My Logs</span></button>
+      <button class="tab" onclick="sw('report')"><i class="ti ti-chart-bar"></i><span>Reports</span></button>
+      <button class="tab mgr" onclick="sw('manager')"><i class="ti ti-shield-lock"></i><span>Manager</span></button>
+    </div>
+  </div>
+
+  <!-- ── LOG SHIFT ── -->
+  <div class="sec active" id="tab-clock">
+    <div id="saving-bar" class="saving-bar"></div>
+    <div id="al-restore" class="alert al-y" style="display:none">
+      <i class="ti ti-clock-pause"></i>
+      <span><strong>Welcome back!</strong> Your shift has been restored. Complete your report and clock out when ready.</span>
+    </div>
+    <div id="al-submit" class="alert al-g" style="display:none">
+      <i class="ti ti-circle-check"></i>
+      <span><strong>Shift submitted!</strong> Your report has been saved to the Fruitful Communities database.</span>
+    </div>
+    <div id="al-error" class="alert al-r" style="display:none">
+      <i class="ti ti-alert-circle"></i>
+      <span id="error-msg">Something went wrong. Please try again.</span>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-user"></i>Student info</div>
+      <div class="r2">
+        <div class="field"><label>First name</label><input type="text" id="fname" placeholder="First name" oninput="autosave()"/></div>
+        <div class="field"><label>Last name</label><input type="text" id="lname" placeholder="Last name" oninput="autosave()"/></div>
+      </div>
+      <div class="field"><label>Program</label><input type="text" id="program" placeholder="e.g. Community Service Worker..." oninput="autosave()"/></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-clock"></i>Clock in / out</div>
+      <div class="clock-row">
+        <div class="clock-display" id="clock-disp">00:00:00</div>
+        <button class="btn-clock in" id="clock-btn" onclick="toggleClock()">Clock In</button>
+        <div class="clock-stat" id="clock-stat"><span class="sdot dot-r"></span>Not clocked in</div>
+      </div>
+      <div class="r2">
+        <div class="field"><label>Clock-in time</label><input type="time" id="cin" oninput="autosave()"/></div>
+        <div class="field"><label>Clock-out time</label><input type="time" id="cout" oninput="autosave()"/></div>
+      </div>
+      <div class="field"><label>Date</label><input type="date" id="sdate" oninput="autosave()"/></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-building-community"></i>Work area</div>
+      <div class="chip-group" id="areas">
+        <div class="chip" onclick="tc(this,'b')">Onboarding</div>
+        <div class="chip" onclick="tc(this,'b')">Engagement</div>
+        <div class="chip" onclick="tc(this,'b')">Program Development</div>
+        <div class="chip" onclick="tc(this,'b')">Food Bank</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-tools"></i>Skills used</div>
+      <div class="slbl">Technical skills</div>
+      <div class="chip-group" id="tskills">
+        <div class="chip" onclick="tc(this,'b')">Data Management</div>
+        <div class="chip" onclick="tc(this,'b')">Client Intake</div>
+        <div class="chip" onclick="tc(this,'b')">Referrals</div>
+        <div class="chip" onclick="tc(this,'b')">Program Design</div>
+        <div class="chip" onclick="tc(this,'b')">Event Planning</div>
+        <div class="chip" onclick="tc(this,'b')">Client Registration</div>
+        <div class="chip" onclick="tc(this,'b')">Social Media Content</div>
+        <div class="chip" onclick="tc(this,'b')">Grant Research</div>
+        <div class="chip" onclick="tc(this,'b')">Newsletter Development</div>
+      </div>
+      <div class="slbl">Soft skills</div>
+      <div class="chip-group" id="sskills">
+        <div class="chip" onclick="tc(this,'y')">Communication</div>
+        <div class="chip" onclick="tc(this,'y')">Conflict Resolution</div>
+        <div class="chip" onclick="tc(this,'y')">Problem-Solving</div>
+        <div class="chip" onclick="tc(this,'y')">Leadership</div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>How did you apply these skills?</label>
+        <textarea id="skills-how" placeholder="Describe specific examples from today's shift..." oninput="autosave()"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-book"></i>Theory &amp; frameworks applied</div>
+      <div class="chip-group" id="fworks">
+        <div class="chip" onclick="tc(this,'g')">Strengths-Based Practice</div>
+        <div class="chip" onclick="tc(this,'g')">Trauma-Informed Care</div>
+        <div class="chip" onclick="tc(this,'g')">Person-Centred Approach</div>
+        <div class="chip" onclick="tc(this,'g')">Anti-Oppressive Practice</div>
+        <div class="chip" onclick="tc(this,'g')">Motivational Interviewing</div>
+        <div class="chip" onclick="tc(this,'g')">Intersectionality</div>
+        <div class="chip" onclick="tc(this,'g')">Systems Theory</div>
+        <div class="chip" onclick="tc(this,'g')">Harm Reduction</div>
+        <div class="chip" onclick="tc(this,'g')">Empowerment Model</div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Describe the situation and how you applied it</label>
+        <textarea id="fw-how" placeholder="e.g. Applied trauma-informed care when..." oninput="autosave()"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-notes"></i>Shift summary</div>
+      <div class="field"><label>What did you accomplish this shift?</label>
+        <textarea id="summary" placeholder="Tasks completed, interactions, outcomes..." oninput="autosave()"></textarea>
+      </div>
+      <div class="field"><label>Challenges or learning moments</label>
+        <textarea id="challenges" placeholder="What challenged you and how did you handle it?" oninput="autosave()"></textarea>
+      </div>
+      <div class="field"><label>Clients onboarded / Participants directly served</label>
+        <input type="number" id="clients" min="0" placeholder="0" style="width:130px" oninput="autosave()"/>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="saveProgress()" style="flex:1">
+        <i class="ti ti-device-floppy"></i> Save progress
+      </button>
+      <button class="btn btn-blue" onclick="submitShift()" style="flex:2">
+        <i class="ti ti-send"></i> Submit shift report
+      </button>
+    </div>
+    <div id="al-saved" class="alert al-b" style="display:none;margin-top:10px">
+      <i class="ti ti-cloud-check"></i>
+      <span>Progress saved to database. You can safely close this tab and return later.</span>
+    </div>
+  </div>
+
+  <!-- ── MY LOGS ── -->
+  <div class="sec" id="tab-logs">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-filter"></i>Filter</div>
+      <div class="r2">
+        <div class="field"><label>Student name</label><input type="text" id="filter-name" oninput="renderLogs()" placeholder="Search..."/></div>
+        <div class="field"><label>Work area</label>
+          <select id="filter-area" onchange="renderLogs()">
+            <option value="">All areas</option>
+            <option>Onboarding</option><option>Engagement</option>
+            <option>Program Development</option><option>Food Bank</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="logs-list"><div class="empty"><i class="ti ti-clipboard-list"></i><p>No shifts logged yet.</p></div></div>
+  </div>
+
+  <!-- ── REPORTS ── -->
+  <div class="sec" id="tab-report">
+    <div class="stats-grid" id="rpt-stats">
+      <div class="stat b"><div class="stat-num b" id="rs1">0</div><div class="stat-lbl">Shifts</div></div>
+      <div class="stat g"><div class="stat-num g" id="rs2">0h</div><div class="stat-lbl">Hours</div></div>
+      <div class="stat y"><div class="stat-num y" id="rs3">0</div><div class="stat-lbl">Clients</div></div>
+      <div class="stat b"><div class="stat-num b" id="rs4">0</div><div class="stat-lbl">Students</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-brand-gmail"></i>Daily report</div>
+      <div id="al-report" class="alert al-g" style="display:none"><i class="ti ti-circle-check"></i><span id="report-msg"></span></div>
+      <div class="info-box">Generates an AI report and creates a Gmail draft to <strong>Deborah@fruitfulcommunities.ca</strong>. Data is pulled live from your Google Sheet.</div>
+      <div class="field"><label>Period</label>
+        <select id="rpt-period"><option value="today">Today</option><option value="week">This week</option><option value="all">All time</option></select>
+      </div>
+      <button class="btn btn-yellow" onclick="sendReport()"><i class="ti ti-brand-gmail"></i> Generate &amp; create Gmail draft</button>
+    </div>
+    <div class="card"><div class="card-title"><i class="ti ti-eye"></i>Preview</div><div id="rpt-preview" style="font-size:13px;color:var(--gray)">Load shifts to preview data.</div></div>
+  </div>
+
+  <!-- ── MANAGER ── -->
+  <div class="sec" id="tab-manager">
+    <div id="mgr-lock">
+      <div class="pin-screen">
+        <div class="pin-icon"><i class="ti ti-lock"></i></div>
+        <h2 style="font-size:19px;font-weight:700;margin-bottom:.3rem">Manager access</h2>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:.25rem">Enter your 4-digit PIN</p>
+        <div class="pin-dots" id="pin-dots">
+          <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+          <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+        </div>
+        <div id="pin-err" class="alert al-r" style="display:none;max-width:240px;margin:0 auto 14px;text-align:center">
+          <i class="ti ti-alert-circle"></i><span>Incorrect PIN. Try again.</span>
+        </div>
+        <div class="numpad">
+          <button class="num-btn" onclick="pn('1')">1</button><button class="num-btn" onclick="pn('2')">2</button><button class="num-btn" onclick="pn('3')">3</button>
+          <button class="num-btn" onclick="pn('4')">4</button><button class="num-btn" onclick="pn('5')">5</button><button class="num-btn" onclick="pn('6')">6</button>
+          <button class="num-btn" onclick="pn('7')">7</button><button class="num-btn" onclick="pn('8')">8</button><button class="num-btn" onclick="pn('9')">9</button>
+          <button class="num-btn" onclick="pc()" style="font-size:14px;color:var(--gray)"><i class="ti ti-backspace"></i></button>
+          <button class="num-btn" onclick="pn('0')">0</button>
+          <button class="num-btn enter" onclick="ps()"><i class="ti ti-check"></i></button>
+        </div>
+        <p style="font-size:11px;color:var(--gray);margin-top:1.25rem">Default PIN: 1234 &mdash; change in Settings</p>
+      </div>
+    </div>
+
+    <div id="mgr-dash" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <img src="data:image/png;base64,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" alt="FC" style="height:34px;width:auto;"/>
+          <div>
+            <div style="font-size:15px;font-weight:700;">Manager dashboard</div>
+            <div style="font-size:12px;color:var(--gray);">Deborah &mdash; Fruitful Communities</div>
+          </div>
+        </div>
+        <button onclick="lockMgr()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:12px;font-weight:600;font-family:var(--font);color:var(--gray);">
+          <i class="ti ti-lock" style="margin-right:4px"></i>Lock
+        </button>
+      </div>
+
+      <div class="mgr-nav">
+        <button class="mgr-btn active" onclick="mn('ov',this)"><i class="ti ti-layout-dashboard" style="margin-right:4px"></i>Overview</button>
+        <button class="mgr-btn" onclick="mn('st',this)"><i class="ti ti-users" style="margin-right:4px"></i>Students</button>
+        <button class="mgr-btn" onclick="mn('sk',this)"><i class="ti ti-chart-bar" style="margin-right:4px"></i>Skills</button>
+        <button class="mgr-btn" onclick="mn('sh',this)"><i class="ti ti-table" style="margin-right:4px"></i>All shifts</button>
+        <button class="mgr-btn" onclick="mn('se',this)"><i class="ti ti-settings" style="margin-right:4px"></i>Settings</button>
+      </div>
+
+      <div class="mgr-sec active" id="ms-ov">
+        <div class="stats-grid">
+          <div class="stat b"><div class="stat-num b" id="ms1">0</div><div class="stat-lbl">Shifts</div></div>
+          <div class="stat g"><div class="stat-num g" id="ms2">0h</div><div class="stat-lbl">Hours</div></div>
+          <div class="stat y"><div class="stat-num y" id="ms3">0</div><div class="stat-lbl">Clients</div></div>
+          <div class="stat b"><div class="stat-num b" id="ms4">0</div><div class="stat-lbl">Students</div></div>
+        </div>
+        <div class="r2">
+          <div class="card"><div class="card-title"><i class="ti ti-building-community"></i>Shifts by area</div><div id="ov-areas"></div></div>
+          <div class="card"><div class="card-title"><i class="ti ti-calendar"></i>Recent activity</div><div id="ov-recent"></div></div>
+        </div>
+        <div class="card"><div class="card-title"><i class="ti ti-trophy"></i>Top students by hours</div><div id="ov-top"></div></div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-brand-gmail"></i>Send report to Deborah</div>
+          <div id="al-mgr-rep" class="alert al-g" style="display:none"><i class="ti ti-circle-check"></i><span id="mgr-rep-msg"></span></div>
+          <div class="field"><label>Period</label>
+            <select id="mgr-period"><option value="today">Today</option><option value="week">This week</option><option value="all">All time</option></select>
+          </div>
+          <button class="btn btn-yellow" onclick="sendReport('mgr')"><i class="ti ti-brand-gmail"></i> Generate &amp; create Gmail draft</button>
+        </div>
+      </div>
+
+      <div class="mgr-sec" id="ms-st">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <div class="card-title" style="margin:0"><i class="ti ti-users"></i>Student roster</div>
+            <button onclick="exportCSV()" style="padding:7px 13px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:5px;"><i class="ti ti-download"></i>CSV</button>
+          </div>
+          <div id="st-roster"></div>
+        </div>
+      </div>
+
+      <div class="mgr-sec" id="ms-sk">
+        <div class="r2">
+          <div class="card"><div class="card-title"><i class="ti ti-tools"></i>Technical skills</div><div id="sk-tech"></div></div>
+          <div class="card"><div class="card-title"><i class="ti ti-heart"></i>Soft skills</div><div id="sk-soft"></div></div>
+        </div>
+        <div class="card"><div class="card-title"><i class="ti ti-book"></i>Frameworks</div><div id="sk-fw"></div></div>
+      </div>
+
+      <div class="mgr-sec" id="ms-sh">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <div class="card-title" style="margin:0"><i class="ti ti-table"></i>All shifts</div>
+            <button onclick="exportCSV()" style="padding:7px 13px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:5px;"><i class="ti ti-download"></i>CSV</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="tbl"><thead><tr><th>Date</th><th>Student</th><th>Program</th><th>Hours</th><th>Areas</th><th>Clients</th><th>Status</th></tr></thead>
+            <tbody id="sh-tbody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <div class="mgr-sec" id="ms-se">
+        <div class="card">
+          <div class="card-title"><i class="ti ti-adjustments"></i>Settings</div>
+          <div class="field"><label>Recipient email</label><input type="email" id="set-email" value="Deborah@fruitfulcommunities.ca"/></div>
+          <div class="field"><label>Manager PIN (4 digits)</label><input type="password" id="set-pin" maxlength="4" placeholder="Change PIN" style="width:150px;letter-spacing:.3em"/></div>
+          <button class="btn btn-blue" onclick="saveSettings()"><i class="ti ti-device-floppy"></i>Save settings</button>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color:#a11"><i class="ti ti-database" style="color:var(--red)"></i>Database status</div>
+          <p style="font-size:13px;color:var(--gray);margin-bottom:10px">All shift data is stored in your Google Sheet and synced in real time. No local storage is used.</p>
+          <div id="db-status" style="font-size:13px;color:var(--gray)">Checking connection...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+//  CONFIG 
+const API = 'https://script.google.com/macros/s/AKfycby_U45-x8LQAgkyUv0aNb1kABK91ou6icrwCzEprwKzw8IJbOuOW6qmsIsN5PzlD6cE/exec';
+const EMAIL = 'Deborah@fruitfulcommunities.ca';
+const DRAFT_KEY = 'fc_draft';
+const CFG_KEY = 'fc_cfg';
+const AREAS = ['Onboarding','Engagement','Program Development','Food Bank'];
+const TECH = ['Data Management','Client Intake','Referrals','Program Design','Event Planning','Client Registration','Social Media Content','Grant Research','Newsletter Development'];
+const SOFT = ['Communication','Conflict Resolution','Problem-Solving','Leadership'];
+const FW = ['Strengths-Based Practice','Trauma-Informed Care','Person-Centred Approach','Anti-Oppressive Practice','Motivational Interviewing','Intersectionality','Systems Theory','Harm Reduction','Empowerment Model'];
+
+let shifts = [], mgrPin = '1234', mgrOpen = false, pin = '', autosaveTimer = null;
+
+//  INIT 
+async function init() {
+  document.getElementById('sdate').value = new Date().toISOString().split('T')[0];
+  loadConfig();
+  restoreDraft();
+  await loadShifts();
 }
 
-// ── SCHEDULED TRIGGER ────────────────────────────────────
-function sendScheduledReport() {
-  sendDailyReport('today');
+function loadConfig() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    if (c.pin) mgrPin = c.pin;
+    if (c.email) document.getElementById('set-email').value = c.email;
+  } catch(e) {}
 }
+
+//  GOOGLE SHEETS API 
+async function api(action, data = {}) {
+  const params = new URLSearchParams({ action, ...data });
+  const resp = await fetch(API + '?' + params.toString(), { method: 'GET' });
+  const text = await resp.text();
+  try { return JSON.parse(text); }
+  catch(e) { return { success: false, error: 'Bad response: ' + text.substring(0,100) }; }
+}
+
+async function loadShifts() {
+  try {
+    setConnStatus(true, 'Loading...');
+    const r = await api('getShifts');
+    if (r.success) {
+      shifts = r.shifts || [];
+      setConnStatus(true, 'Connected');
+      updateStats();
+      renderLogs();
+      renderRptPreview();
+    } else {
+      setConnStatus(false, 'Sheet error');
+    }
+  } catch(e) {
+    setConnStatus(false, 'Offline');
+  }
+}
+
+function setConnStatus(ok, msg) {
+  const el = document.getElementById('conn-status');
+  el.innerHTML = ok
+    ? `<span class="status-dot"></span> ${msg}`
+    : `<span style="width:7px;height:7px;border-radius:50%;background:#f87171;display:inline-block"></span> ${msg}`;
+  if (document.getElementById('db-status')) {
+    document.getElementById('db-status').innerHTML = ok
+      ? `<span class="conn-ok"><i class="ti ti-circle-check" style="margin-right:4px"></i>Connected to Google Sheet &mdash; ${shifts.length} shifts loaded</span>`
+      : `<span class="conn-err"><i class="ti ti-alert-circle" style="margin-right:4px"></i>Connection error. Check Apps Script deployment.</span>`;
+  }
+}
+
+//  DRAFT / AUTOSAVE 
+function getDraftData() {
+  return {
+    fname: document.getElementById('fname').value,
+    lname: document.getElementById('lname').value,
+    program: document.getElementById('program').value,
+    cin: document.getElementById('cin').value,
+    cout: document.getElementById('cout').value,
+    sdate: document.getElementById('sdate').value,
+    clockStart: window._clockStart || null,
+    clockRunning: !!window._clockInt,
+    skillsHow: document.getElementById('skills-how').value,
+    fwHow: document.getElementById('fw-how').value,
+    summary: document.getElementById('summary').value,
+    challenges: document.getElementById('challenges').value,
+    clients: document.getElementById('clients').value,
+    areas: getChips('areas'),
+    tskills: getChips('tskills'),
+    sskills: getChips('sskills'),
+    fworks: getChips('fworks'),
+  };
+}
+
+function autosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    const d = getDraftData();
+    if (d.fname || d.cin) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    }
+  }, 800);
+}
+
+function saveProgress() {
+  const d = getDraftData();
+  if (!d.fname && !d.cin) { showAlert('al-error', 'error-msg', 'Please enter your name before saving.'); return; }
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  const sb = document.getElementById('saving-bar');
+  sb.classList.add('active');
+  setTimeout(() => sb.classList.remove('active'), 1200);
+  const a = document.getElementById('al-saved');
+  a.style.display = 'flex';
+  clearTimeout(window._saveTimer);
+  window._saveTimer = setTimeout(() => a.style.display = 'none', 5000);
+}
+
+function restoreDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (!d.fname && !d.cin) return;
+    document.getElementById('fname').value = d.fname || '';
+    document.getElementById('lname').value = d.lname || '';
+    document.getElementById('program').value = d.program || '';
+    document.getElementById('cin').value = d.cin || '';
+    document.getElementById('cout').value = d.cout || '';
+    document.getElementById('sdate').value = d.sdate || new Date().toISOString().split('T')[0];
+    document.getElementById('skills-how').value = d.skillsHow || '';
+    document.getElementById('fw-how').value = d.fwHow || '';
+    document.getElementById('summary').value = d.summary || '';
+    document.getElementById('challenges').value = d.challenges || '';
+    document.getElementById('clients').value = d.clients || '';
+    if (d.areas) d.areas.forEach(v => selectChip('areas', v, 'b'));
+    if (d.tskills) d.tskills.forEach(v => selectChip('tskills', v, 'b'));
+    if (d.sskills) d.sskills.forEach(v => selectChip('sskills', v, 'y'));
+    if (d.fworks) d.fworks.forEach(v => selectChip('fworks', v, 'g'));
+    if (d.cin) {
+      document.getElementById('clock-btn').textContent = 'Clock Out';
+      document.getElementById('clock-btn').className = 'btn-clock out';
+      document.getElementById('clock-stat').innerHTML = '<span class="sdot dot-g"></span>Clocked in';
+      if (d.clockStart) {
+        window._clockStart = d.clockStart;
+        window._clockInt = setInterval(() => {
+          const e = Math.floor((Date.now() - window._clockStart) / 1000);
+          document.getElementById('clock-disp').textContent =
+            `${pad(Math.floor(e/3600))}:${pad(Math.floor((e%3600)/60))}:${pad(e%60)}`;
+        }, 1000);
+      }
+      document.getElementById('al-restore').style.display = 'flex';
+    }
+  } catch(e) {}
+}
+
+function selectChip(groupId, value, cls) {
+  const chips = document.querySelectorAll(`#${groupId} .chip`);
+  chips.forEach(c => { if (c.textContent.trim() === value) c.classList.add('sel-' + cls); });
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+}
+
+//  CLOCK 
+function toggleClock() {
+  const btn = document.getElementById('clock-btn');
+  if (btn.classList.contains('in')) {
+    const fn = document.getElementById('fname').value.trim();
+    const ln = document.getElementById('lname').value.trim();
+    const prog = document.getElementById('program').value.trim();
+    if (!fn || !ln) { showAlert('al-error', 'error-msg', 'Please enter your name before clocking in.'); return; }
+    if (!prog) { showAlert('al-error', 'error-msg', 'Please enter your program before clocking in.'); return; }
+    const now = new Date();
+    document.getElementById('cin').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    document.getElementById('sdate').value = now.toISOString().split('T')[0];
+    btn.textContent = 'Clock Out'; btn.className = 'btn-clock out';
+    document.getElementById('clock-stat').innerHTML = '<span class="sdot dot-g"></span>Clocked in';
+    document.getElementById('al-restore').style.display = 'none';
+    window._clockStart = Date.now();
+    window._clockInt = setInterval(() => {
+      const e = Math.floor((Date.now() - window._clockStart) / 1000);
+      document.getElementById('clock-disp').textContent =
+        `${pad(Math.floor(e/3600))}:${pad(Math.floor((e%3600)/60))}:${pad(e%60)}`;
+    }, 1000);
+    autosave();
+  } else {
+    clearInterval(window._clockInt); window._clockInt = null;
+    const now = new Date();
+    document.getElementById('cout').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    btn.textContent = 'Clock In'; btn.className = 'btn-clock in';
+    document.getElementById('clock-stat').innerHTML = '<span class="sdot dot-r"></span>Clocked out &mdash; please complete and submit';
+    autosave();
+  }
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+//  CHIPS 
+function tc(el, c) {
+  const cls = ['sel-b','sel-y','sel-g'];
+  const was = cls.some(x => el.classList.contains(x));
+  cls.forEach(x => el.classList.remove(x));
+  if (!was) el.classList.add('sel-' + c);
+  autosave();
+}
+
+function getChips(id) {
+  return [...document.querySelectorAll(`#${id} .chip.sel-b,#${id} .chip.sel-y,#${id} .chip.sel-g`)]
+    .map(c => c.textContent.trim());
+}
+
+//  DURATION 
+function calcDur(i, o) {
+  if (!i || !o) return 0;
+  const [ih, im] = i.split(':').map(Number);
+  const [oh, om] = o.split(':').map(Number);
+  return Math.max(0, (oh * 60 + om) - (ih * 60 + im));
+}
+
+//  SUBMIT 
+async function submitShift() {
+  const fn = document.getElementById('fname').value.trim();
+  const ln = document.getElementById('lname').value.trim();
+  if (!fn || !ln) { showAlert('al-error','error-msg','Please enter your name.'); return; }
+  const prog = document.getElementById('program').value.trim();
+  if (!prog) { showAlert('al-error','error-msg','Please enter your program.'); return; }
+  const cin = document.getElementById('cin').value;
+  const cout = document.getElementById('cout').value;
+  if (!cin || !cout) { showAlert('al-error','error-msg','Please enter clock-in and clock-out times.'); return; }
+
+  const btn = document.querySelector('[onclick="submitShift()"]');
+  btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Submitting...';
+
+  const payload = {
+    action: 'submitShift',
+    shiftId: `${fn.toLowerCase().replace(/\s/g,'')}_${Date.now()}`,
+    date: document.getElementById('sdate').value,
+    firstName: fn, lastName: ln, program: prog,
+    clockIn: cin, clockOut: cout,
+    hours: (calcDur(cin, cout) / 60).toFixed(2),
+    status: 'Submitted',
+    areas: getChips('areas').join(', '),
+    techSkills: getChips('tskills').join(', '),
+    softSkills: getChips('sskills').join(', '),
+    skillsHow: document.getElementById('skills-how').value,
+    frameworks: getChips('fworks').join(', '),
+    frameworkHow: document.getElementById('fw-how').value,
+    summary: document.getElementById('summary').value,
+    challenges: document.getElementById('challenges').value,
+    clients: document.getElementById('clients').value || '0',
+    submittedAt: new Date().toISOString(),
+  };
+
+  try {
+    const r = await api('submitShift', payload);
+    if (r.success) {
+      clearDraft();
+      clearInterval(window._clockInt); window._clockInt = null;
+      document.getElementById('al-submit').style.display = 'flex';
+      document.getElementById('al-restore').style.display = 'none';
+      document.getElementById('al-saved').style.display = 'none';
+      // Reset form
+      document.getElementById('clock-disp').textContent = '00:00:00';
+      ['fname','lname','program','cin','cout','skills-how','fw-how','summary','challenges','clients'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('sdate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('clock-btn').textContent = 'Clock In';
+      document.getElementById('clock-btn').className = 'btn-clock in';
+      document.getElementById('clock-stat').innerHTML = '<span class="sdot dot-r"></span>Not clocked in';
+      document.querySelectorAll('.chip.sel-b,.chip.sel-y,.chip.sel-g').forEach(c => c.classList.remove('sel-b','sel-y','sel-g'));
+      setTimeout(() => document.getElementById('al-submit').style.display = 'none', 6000);
+      await loadShifts();
+    } else {
+      showAlert('al-error','error-msg', r.error || 'Submission failed. Please try again.');
+    }
+  } catch(e) {
+    showAlert('al-error','error-msg','Network error. Please check your connection and try again.');
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit shift report';
+  }
+}
+
+//  STATS / LOGS 
+function updateStats() {
+  const tm = shifts.reduce((a,s) => a + (parseFloat(s.hours)||0), 0);
+  const names = new Set(shifts.map(s => s.firstName + ' ' + s.lastName));
+  document.getElementById('rs1').textContent = shifts.length;
+  document.getElementById('rs2').textContent = tm.toFixed(1) + 'h';
+  document.getElementById('rs3').textContent = shifts.reduce((a,s) => a + (parseInt(s.clients)||0), 0);
+  document.getElementById('rs4').textContent = names.size;
+  if (document.getElementById('ms1')) {
+    document.getElementById('ms1').textContent = shifts.length;
+    document.getElementById('ms2').textContent = tm.toFixed(1) + 'h';
+    document.getElementById('ms3').textContent = shifts.reduce((a,s) => a + (parseInt(s.clients)||0), 0);
+    document.getElementById('ms4').textContent = names.size;
+  }
+}
+
+function renderLogs() {
+  const nf = (document.getElementById('filter-name').value||'').toLowerCase();
+  const af = document.getElementById('filter-area').value;
+  const f = shifts.filter(s => {
+    const name = `${s.firstName} ${s.lastName}`.toLowerCase();
+    const areaMatch = !af || (s.areas||'').includes(af);
+    return name.includes(nf) && areaMatch;
+  }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  const el = document.getElementById('logs-list');
+  if (!f.length) { el.innerHTML = '<div class="empty"><i class="ti ti-clipboard-list"></i><p>No shifts found.</p></div>'; return; }
+
+  el.innerHTML = f.map(s => {
+    const areas = (s.areas||'').split(',').filter(Boolean).map(a => `<span class="badge bdg-b">${a.trim()}</span>`).join('');
+    const skills = [...(s.techSkills||'').split(','), ...(s.softSkills||'').split(',')]
+      .filter(Boolean).map(sk => `<span class="badge bdg-y">${sk.trim()}</span>`).join('');
+    const fws = (s.frameworks||'').split(',').filter(Boolean).map(fw => `<span class="badge bdg-g">${fw.trim()}</span>`).join('');
+    const statusColor = s.status === 'Submitted' ? 'bdg-g' : 'bdg-y';
+    return `<div class="card log-item">
+      <div class="log-top">
+        <span class="log-name">${s.firstName} ${s.lastName}</span>
+        <span class="badge ${statusColor}">${s.status||'Draft'}</span>
+      </div>
+      <div class="log-meta">${s.program||''} &middot; ${s.date} &middot; ${s.clockIn||''}${s.clockOut?'&ndash;'+s.clockOut:''} &middot; ${parseFloat(s.hours||0).toFixed(1)}h &middot; ${s.clients||0} client(s)</div>
+      ${areas?`<div class="log-chips" style="margin-bottom:5px">${areas}</div>`:''}
+      ${skills?`<div class="log-chips" style="margin-bottom:5px">${skills}</div>`:''}
+      ${fws?`<div class="log-chips">${fws}</div>`:''}
+      ${s.summary?`<div style="font-size:12px;color:var(--gray);margin-top:6px;font-style:italic">"${s.summary.substring(0,120)}${s.summary.length>120?'...':''}"</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderRptPreview() {
+  const el = document.getElementById('rpt-preview');
+  if (!shifts.length) { el.innerHTML = 'No shifts loaded yet.'; return; }
+  const today = new Date().toISOString().split('T')[0];
+  const ts = shifts.filter(s => s.date === today);
+  const tm = shifts.reduce((a,s) => a+(parseFloat(s.hours)||0), 0);
+  el.innerHTML = `<div style="line-height:1.8;font-size:13px">
+    <div><strong>All time:</strong> ${shifts.length} shifts &middot; ${tm.toFixed(1)}h &middot; ${shifts.reduce((a,s)=>a+(parseInt(s.clients)||0),0)} clients</div>
+    <div><strong>Today:</strong> ${ts.length} shift(s)</div>
+    <div><strong>Students:</strong> ${[...new Set(shifts.map(s=>s.firstName+' '+s.lastName))].join(', ')||'&mdash;'}</div>
+  </div>`;
+}
+
+//  MANAGER 
+function pn(d) {
+  if (pin.length >= 4) return;
+  pin += d;
+  for (let i=0;i<4;i++) document.getElementById(`pd${i}`).classList.toggle('filled', i < pin.length);
+  if (pin.length === 4) setTimeout(ps, 200);
+}
+function pc() {
+  if (!pin.length) return;
+  pin = pin.slice(0,-1);
+  for (let i=0;i<4;i++) document.getElementById(`pd${i}`).classList.toggle('filled', i < pin.length);
+}
+function ps() {
+  if (pin === mgrPin) {
+    mgrOpen = true; pin = '';
+    document.getElementById('mgr-lock').style.display = 'none';
+    document.getElementById('mgr-dash').style.display = 'block';
+    document.getElementById('pin-err').style.display = 'none';
+    for (let i=0;i<4;i++) document.getElementById(`pd${i}`).classList.remove('filled');
+    renderMgr();
+  } else {
+    document.getElementById('pin-err').style.display = 'flex';
+    pin = '';
+    for (let i=0;i<4;i++) document.getElementById(`pd${i}`).classList.remove('filled');
+    setTimeout(() => document.getElementById('pin-err').style.display = 'none', 2500);
+  }
+}
+function lockMgr() {
+  mgrOpen = false; pin = '';
+  document.getElementById('mgr-lock').style.display = 'block';
+  document.getElementById('mgr-dash').style.display = 'none';
+}
+function mn(s, btn) {
+  document.querySelectorAll('.mgr-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mgr-sec').forEach(sec => sec.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('ms-' + s).classList.add('active');
+  if (s === 'ov') renderOv();
+  if (s === 'st') renderStudents();
+  if (s === 'sk') renderSkills();
+  if (s === 'sh') renderAllShifts();
+  if (s === 'se') setConnStatus(shifts.length > 0, shifts.length > 0 ? 'Connected' : 'No data');
+}
+function renderMgr() { updateStats(); renderOv(); }
+
+function mkBar(lbl, v, max, cls) {
+  const p = max ? Math.round((v/max)*100) : 0;
+  return `<div class="bar-item"><div class="bar-label"><span>${lbl}</span><span>${v}</span></div>
+    <div class="bar-track"><div class="bar-fill ${cls}" style="width:${p}%"></div></div></div>`;
+}
+
+function renderOv() {
+  const ac = {}; AREAS.forEach(a => ac[a]=0);
+  shifts.forEach(s => (s.areas||'').split(',').forEach(a => { a=a.trim(); if(ac[a]!==undefined) ac[a]++; }));
+  const amax = Math.max(...Object.values(ac), 1);
+  document.getElementById('ov-areas').innerHTML = AREAS.map(a => mkBar(a, ac[a], amax, 'bar-blue')).join('');
+
+  const rec = shifts.slice().sort((a,b) => new Date(b.date)-new Date(a.date)).slice(0,5);
+  document.getElementById('ov-recent').innerHTML = rec.length
+    ? rec.map(s => `<div style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px"><div style="font-weight:600">${s.firstName} ${s.lastName}</div><div style="color:var(--gray)">${s.date} &middot; ${parseFloat(s.hours||0).toFixed(1)}h</div></div>`).join('')
+    : '<div style="font-size:13px;color:var(--gray)">No activity yet.</div>';
+
+  const by = {}; shifts.forEach(s => { const k=s.firstName+' '+s.lastName; by[k]=(by[k]||0)+parseFloat(s.hours||0); });
+  const top = Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const tmax = top.length ? top[0][1] : 1;
+  document.getElementById('ov-top').innerHTML = top.length
+    ? top.map(([n,h]) => mkBar(n, h.toFixed(1)+'h', tmax, 'bar-green')).join('')
+    : '<div style="font-size:13px;color:var(--gray)">No data yet.</div>';
+}
+
+function renderStudents() {
+  const by = {};
+  shifts.forEach(s => {
+    const k = s.firstName+' '+s.lastName;
+    if (!by[k]) by[k] = {name:k,program:s.program,shifts:0,hours:0,clients:0,areas:new Set()};
+    by[k].shifts++; by[k].hours+=parseFloat(s.hours||0); by[k].clients+=parseInt(s.clients||0);
+    (s.areas||'').split(',').forEach(a => { a=a.trim(); if(a) by[k].areas.add(a); });
+  });
+  const list = Object.values(by).sort((a,b)=>b.hours-a.hours);
+  const colors = ['#1B5AAB','#3AAA35','#E63329','#F2CC0C'];
+  document.getElementById('st-roster').innerHTML = list.length
+    ? list.map((st,i) => {
+        const ini = st.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+        const bg = colors[i%4];
+        return `<div class="student-row">
+          <div class="avatar" style="background:${bg}22;color:${bg}">${ini}</div>
+          <div class="stu-info"><div class="stu-name">${st.name}</div><div class="stu-meta">${st.program||''} &middot; ${[...st.areas].join(', ')||'No areas'}</div></div>
+          <div class="stu-stats"><strong>${st.hours.toFixed(1)}h</strong>${st.shifts} shift(s) &middot; ${st.clients} clients</div>
+        </div>`;
+      }).join('')
+    : '<div class="empty"><i class="ti ti-users"></i><p>No students yet.</p></div>';
+}
+
+function renderSkills() {
+  const tc2={}, sc2={}, fc2={};
+  TECH.forEach(k=>tc2[k]=0); SOFT.forEach(k=>sc2[k]=0); FW.forEach(k=>fc2[k]=0);
+  shifts.forEach(s => {
+    (s.techSkills||'').split(',').forEach(k=>{k=k.trim();if(tc2[k]!==undefined)tc2[k]++;});
+    (s.softSkills||'').split(',').forEach(k=>{k=k.trim();if(sc2[k]!==undefined)sc2[k]++;});
+    (s.frameworks||'').split(',').forEach(k=>{k=k.trim();if(fc2[k]!==undefined)fc2[k]++;});
+  });
+  const tm=Math.max(...Object.values(tc2),1), sm=Math.max(...Object.values(sc2),1), fm=Math.max(...Object.values(fc2),1);
+  document.getElementById('sk-tech').innerHTML = TECH.map(k=>mkBar(k,tc2[k],tm,'bar-blue')).join('');
+  document.getElementById('sk-soft').innerHTML = SOFT.map(k=>mkBar(k,sc2[k],sm,'bar-yellow')).join('');
+  document.getElementById('sk-fw').innerHTML = FW.map(k=>mkBar(k,fc2[k],fm,'bar-green')).join('');
+}
+
+function renderAllShifts() {
+  const tb = document.getElementById('sh-tbody');
+  if (!shifts.length) { tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:1.5rem">No shifts yet.</td></tr>'; return; }
+  tb.innerHTML = shifts.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).map(s =>
+    `<tr><td>${s.date}</td><td>${s.firstName} ${s.lastName}</td><td style="font-size:11px">${s.program||''}</td>
+    <td>${parseFloat(s.hours||0).toFixed(1)}h</td><td style="font-size:11px">${s.areas||'&mdash;'}</td>
+    <td>${s.clients||0}</td><td><span class="badge ${s.status==='Submitted'?'bdg-g':'bdg-y'}">${s.status||'Draft'}</span></td></tr>`
+  ).join('');
+}
+
+//  REPORTS 
+function getSubset(period) {
+  const today = new Date().toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now()-7*86400000).toISOString().split('T')[0];
+  if (period === 'today') return shifts.filter(s => s.date === today);
+  if (period === 'week') return shifts.filter(s => s.date >= weekAgo);
+  return shifts;
+}
+
+function sendReport(src) {
+  const period = src === 'mgr'
+    ? document.getElementById('mgr-period').value
+    : document.getElementById('rpt-period').value;
+  const alertEl = src === 'mgr' ? 'al-mgr-rep' : 'al-report';
+  const msgEl = src === 'mgr' ? 'mgr-rep-msg' : 'report-msg';
+
+  function flash(msg, good) {
+    const el = document.getElementById(alertEl), m = document.getElementById(msgEl);
+    if (!el || !m) return;
+    m.textContent = msg;
+    el.className = 'alert ' + (good ? 'al-g' : 'al-r');
+    el.style.display = 'flex';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.style.display = 'none', 8000);
+  }
+
+  const sub = getSubset(period);
+  if (!sub.length) { flash('No shifts found for this period.', false); return; }
+
+  const tm = sub.reduce((a,s)=>a+parseFloat(s.hours||0),0);
+  const names = [...new Set(sub.map(s=>s.firstName+' '+s.lastName))];
+  const areas = [...new Set(sub.flatMap(s=>(s.areas||'').split(',').map(a=>a.trim()).filter(Boolean)))];
+  const skc = {};
+  sub.flatMap(s=>[...(s.techSkills||'').split(','),...(s.softSkills||'').split(',')].map(x=>x.trim()).filter(Boolean))
+    .forEach(sk=>skc[sk]=(skc[sk]||0)+1);
+  const topSkills = Object.entries(skc).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}(${v})`).join(', ');
+  const fwc = {};
+  sub.flatMap(s=>(s.frameworks||'').split(',').map(x=>x.trim()).filter(Boolean))
+    .forEach(fw=>fwc[fw]=(fwc[fw]||0)+1);
+  const topFW = Object.entries(fwc).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}(${v})`).join(', ');
+  const details = sub.map(s=>`${s.date}|${s.firstName} ${s.lastName}|${s.program}|${parseFloat(s.hours||0).toFixed(1)}h|${s.areas||''}|${s.clients||0} clients|Skills:${s.techSkills||''} ${s.softSkills||''}|Frameworks:${s.frameworks||''}|Summary:${(s.summary||'').substring(0,80)}`).join('\n');
+  const msg = `FRUITFUL_REPORT_REQUEST|email:${EMAIL}|period:${period}|shifts:${sub.length}|hours:${tm.toFixed(1)}|clients:${sub.reduce((a,s)=>a+(parseInt(s.clients)||0),0)}|students:${names.join(',')}|areas:${areas.join(',')}|topSkills:${topSkills}|topFrameworks:${topFW}|date:${new Date().toLocaleDateString('en-CA')}|SHIFTS:\n${details}`;
+
+  try {
+    if (typeof sendPrompt === 'function') {
+      sendPrompt(msg);
+      flash(`Sending ${sub.length} shift(s) to Claude  Gmail draft will appear shortly in the chat.`, true);
+    } else {
+      navigator.clipboard.writeText(msg)
+        .then(() => flash('Report data copied! Paste into your Claude chat to generate the Gmail draft.', true))
+        .catch(() => flash('Could not copy. Please use the chat widget to generate reports.', false));
+    }
+  } catch(err) {
+    flash('Error: ' + err.message, false);
+  }
+}
+
+//  EXPORT CSV 
+function exportCSV() {
+  const rows = [['Date','First Name','Last Name','Program','Clock In','Clock Out','Hours','Areas','Tech Skills','Soft Skills','Frameworks','Clients','Summary','Challenges','Status']];
+  shifts.forEach(s => rows.push([s.date,s.firstName,s.lastName,s.program,s.clockIn,s.clockOut,s.hours,s.areas,s.techSkills,s.softSkills,s.frameworks,s.clients,s.summary,s.challenges,s.status]));
+  const csv = rows.map(r=>r.map(c=>'"'+(String(c||'').replace(/"/g,'""'))+'"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'fruitful_placements.csv';
+  a.click();
+}
+
+//  SETTINGS 
+function saveSettings() {
+  const p = document.getElementById('set-pin').value;
+  if (p && p.length===4 && /^\d+$/.test(p)) mgrPin = p;
+  const email = document.getElementById('set-email').value;
+  try { localStorage.setItem(CFG_KEY, JSON.stringify({pin:mgrPin,email})); } catch(e) {}
+  alert('Settings saved!');
+}
+
+//  TABS 
+function sw(t) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sec').forEach(s => s.classList.remove('active'));
+  const tabs = ['clock','logs','report','manager'];
+  document.querySelectorAll('.tab')[tabs.indexOf(t)].classList.add('active');
+  document.getElementById('tab-'+t).classList.add('active');
+  if (t === 'logs') { renderLogs(); }
+  if (t === 'report') { updateStats(); renderRptPreview(); }
+  if (t === 'manager' && mgrOpen) renderMgr();
+}
+
+//  ALERTS 
+function showAlert(id, msgId, msg) {
+  const el = document.getElementById(id), m = document.getElementById(msgId);
+  if (!el) return;
+  if (m) m.textContent = msg;
+  el.style.display = 'flex';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.display = 'none', 5000);
+}
+
+//  START 
+init();
+</script>
+</body>
+</html>
